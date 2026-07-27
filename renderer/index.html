@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Project Pusher</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <h1>Project Pusher</h1>
+    <button id="selectFolder" class="button">V&aelig;lg projektmappe</button>
+    <span id="folderPath" class="folder-path">Ingen mappe valgt</span>
+    <button id="securityGuide" class="button">GitHub Ruleset-guide</button>
+    <div class="tree-container" id="tree">V&aelig;lg en mappe for at se indhold.</div>
+  </aside>
+
+  <main>
+    <section class="card">
+      <h2>Verifikation</h2>
+      <div class="form-row">
+        <select id="testPreset">
+          <option value="npm-test">npm test</option>
+          <option value="npm-lint">npm run lint</option>
+          <option value="npm-build">npm run build</option>
+          <option value="pytest">python -m pytest</option>
+          <option value="dotnet-test">dotnet test</option>
+        </select>
+        <button id="runTests" class="button primary">K&oslash;r</button>
+      </div>
+      <pre id="testOutput" class="output">V&aelig;lg en mappe og en test.</pre>
+    </section>
+
+    <section class="card">
+      <h2>Gener&eacute;r projektfiler</h2>
+      <p>Eksisterende filer overskrives aldrig.</p>
+      <div class="checks">
+        <label><input type="checkbox" id="gitignore" checked> .gitignore</label>
+        <label><input type="checkbox" id="readme" checked> README.md</label>
+        <label><input type="checkbox" id="license"> MIT LICENSE</label>
+        <label><input type="checkbox" id="editorconfig"> .editorconfig</label>
+        <label><input type="checkbox" id="contributing"> CONTRIBUTING.md</label>
+        <label><input type="checkbox" id="changelog"> CHANGELOG.md</label>
+        <label><input type="checkbox" id="ci"> GitHub CI</label>
+      </div>
+      <div class="form-row">
+        <input type="text" id="projectName" placeholder="Projektnavn" maxlength="100">
+        <input type="text" id="description" placeholder="Kort beskrivelse" maxlength="300">
+      </div>
+      <div class="form-row">
+        <input type="text" id="author" placeholder="Rettighedshaver" maxlength="100">
+        <input type="text" id="year" inputmode="numeric" value="2026" maxlength="4">
+      </div>
+      <button id="generate" class="button primary">Gener&eacute;r filer</button>
+      <pre id="generateOutput" class="output">Ingen filer genereret endnu.</pre>
+    </section>
+
+    <section class="card">
+      <h2>Push til GitHub</h2>
+      <p>Brug helst et fine-grained token med adgang kun til det valgte repository. Token gemmes ikke.</p>
+      <input type="password" id="tokenInput" placeholder="GitHub-token" autocomplete="off">
+      <div class="form-row">
+        <input type="url" id="remoteUrl" placeholder="https://github.com/bruger/repository.git">
+        <input type="text" id="branch" value="main" maxlength="100">
+      </div>
+      <button id="push" class="button success">Push nu</button>
+      <pre id="pushOutput" class="output">Ikke pushet endnu.</pre>
+    </section>
+  </main>
+  <script src="renderer.js"></script>
+</body>
+</html>

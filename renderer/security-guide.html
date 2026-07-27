@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; object-src 'none'; base-uri 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GitHub Ruleset-guide</title>
+  <style>
+    :root { color-scheme: light; --ink: #182033; --muted: #596579; --line: #dce1ea; --panel: #fff; --bg: #f5f7fb; --on: #18733c; --off: #6b7280; --maybe: #9a6700; --blue: #365dcc; }
+    * { box-sizing: border-box; }
+    body { font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 920px; margin: 0 auto; padding: 30px 24px 60px; color: var(--ink); background: var(--bg); }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin: 0 0 12px; font-size: 20px; }
+    h3 { margin: 20px 0 8px; font-size: 16px; }
+    p { margin: 8px 0; }
+    .intro { color: var(--muted); font-size: 16px; margin-bottom: 22px; }
+    section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin: 16px 0; }
+    code { background: #f1f3f6; padding: 2px 5px; border-radius: 4px; }
+    ol, ul { padding-left: 24px; }
+    li { margin: 7px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); padding: 10px 8px; }
+    th { font-size: 13px; color: var(--muted); }
+    .badge { display: inline-block; min-width: 72px; text-align: center; border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 700; }
+    .on { color: var(--on); background: #e9f7ef; }
+    .off { color: var(--off); background: #f0f1f3; }
+    .maybe { color: var(--maybe); background: #fff5cc; }
+    .profile { border-left: 4px solid var(--blue); background: #f0f4ff; padding: 12px 14px; margin: 12px 0; }
+    .warning { border-left: 4px solid #c2410c; background: #fff3e8; padding: 12px 14px; margin: 12px 0; }
+    .small { color: var(--muted); font-size: 13px; }
+    @media (max-width: 680px) {
+      body { padding: 20px 12px 40px; }
+      section { padding: 15px; }
+      table, tbody, tr, td { display: block; }
+      thead { display: none; }
+      td { border: 0; padding: 5px 0; }
+      tr { display: block; border-bottom: 1px solid var(--line); padding: 10px 0; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Sikkert GitHub Ruleset uden un&oslash;dig friktion</h1>
+  <p class="intro">Denne opskrift beskytter <code>main</code> mod direkte og destruktive &aelig;ndringer, men lader stadig et solo-projekt eller et lille team arbejde normalt via pull requests.</p>
+
+  <section>
+    <h2>1. Klarg&oslash;r repository</h2>
+    <ol>
+      <li>&Aring;bn repository p&aring; GitHub.</li>
+      <li>G&aring; til <code>Settings</code> &rarr; <code>General</code> &rarr; <code>Pull Requests</code>.</li>
+      <li>Aktiv&eacute;r <strong>Allow squash merging</strong>. Du kan deaktivere merge commits og rebase merging for en enkel, line&aelig;r historik.</li>
+      <li>Aktiv&eacute;r gerne <strong>Automatically delete head branches</strong>. Det rydder feature-branches efter merge uden at r&oslash;re <code>main</code>.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>2. Opret branch-rulesettet</h2>
+    <ol>
+      <li>G&aring; til <code>Settings</code> &rarr; <code>Rules</code> &rarr; <code>Rulesets</code>.</li>
+      <li>V&aelig;lg <code>New ruleset</code> &rarr; <code>New branch ruleset</code>.</li>
+      <li>Navn: <code>Protect default branch</code>.</li>
+      <li>Start med <strong>Enforcement status: Disabled</strong>, mens du udfylder og kontrollerer valgene.</li>
+      <li>Under <strong>Target branches</strong>: v&aelig;lg <code>Include default branch</code>. Brug ikke <code>*</code>; feature-branches skal fortsat v&aelig;re nemme at arbejde p&aring;.</li>
+    </ol>
+    <div class="profile"><strong>Bypass list:</strong> Lad den helst v&aelig;re tom. Hvis du vil have en n&oslash;dudgang, tilf&oslash;j kun repository-administrator som <strong>For pull requests only</strong>. Undg&aring; <strong>Always allow</strong>, da det igen tillader direkte, ubeskyttede &aelig;ndringer.</div>
+  </section>
+
+  <section>
+    <h2>3. Anbefalede branch-regler</h2>
+    <table>
+      <thead><tr><th>GitHub-indstilling</th><th>Valg</th><th>Hvorfor</th></tr></thead>
+      <tbody>
+        <tr><td>Restrict creations</td><td><span class="badge off">FRA</span></td><td>Default-branchen findes allerede; reglen giver normalt kun ekstra besv&aelig;r.</td></tr>
+        <tr><td>Restrict updates</td><td><span class="badge off">FRA</span></td><td>Kan blokere normale merges. Pull request-reglen nedenfor er den rigtige beskyttelse.</td></tr>
+        <tr><td>Restrict deletions</td><td><span class="badge on">TIL</span></td><td>Forhindrer at <code>main</code> slettes ved en fejl.</td></tr>
+        <tr><td>Require linear history</td><td><span class="badge on">TIL</span></td><td>Holder historikken enkel og g&oslash;r tilbagerulning lettere. Brug squash merge.</td></tr>
+        <tr><td>Require deployments to succeed</td><td><span class="badge off">FRA</span></td><td>Aktiv&eacute;r kun hvis projektet faktisk har et stabilt staging- eller produktionsmilj&oslash;.</td></tr>
+        <tr><td>Require signed commits</td><td><span class="badge off">FRA</span></td><td>God sikkerhed, men kan blokere bots og udviklere, indtil alle har opsat signering korrekt.</td></tr>
+        <tr><td>Require a pull request before merging</td><td><span class="badge on">TIL</span></td><td>Alle &aelig;ndringer til <code>main</code> f&aring;r et synligt PR-spor og kan kontrolleres f&oslash;r merge.</td></tr>
+        <tr><td>Require status checks to pass</td><td><span class="badge maybe">N&Aring;R KLAR</span></td><td>Sl&aring; kun til efter CI-workflowet har k&oslash;rt mindst &eacute;n gang, s&aring; du kan v&aelig;lge det korrekte check-navn.</td></tr>
+        <tr><td>Block force pushes</td><td><span class="badge on">TIL</span></td><td>Forhindrer omskrivning eller tab af godkendt historik.</td></tr>
+        <tr><td>Require code scanning results</td><td><span class="badge maybe">VALGFRI</span></td><td>Aktiv&eacute;r efter CodeQL er sat op og har leveret et gyldigt resultat.</td></tr>
+        <tr><td>Metadata restrictions</td><td><span class="badge off">FRA</span></td><td>Navne- og commitformatregler giver mere friktion end sikkerhed i de fleste sm&aring; projekter.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>4. Indstillinger under pull request-reglen</h2>
+    <h3>Hvis du arbejder alene</h3>
+    <ul>
+      <li><strong>Required approvals: 0</strong>. Du kan ikke godkende din egen PR, s&aring; 1 godkendelse vil l&aring;se et solo-repository.</li>
+      <li><strong>Require conversation resolution before merging: TIL</strong>.</li>
+      <li><strong>Allowed merge methods: Squash</strong>.</li>
+      <li>Dismiss stale approvals, Code Owner review og approval of most recent push: <strong>FRA</strong>, fordi de kr&aelig;ver en anden person.</li>
+    </ul>
+    <h3>Hvis I er mindst to aktive udviklere</h3>
+    <ul>
+      <li><strong>Required approvals: 1</strong>.</li>
+      <li><strong>Require approval of the most recent reviewable push: TIL</strong>. Det beskytter mod nye &aelig;ndringer efter en godkendelse uden at nulstille alle tidligere reviews.</li>
+      <li><strong>Require conversation resolution before merging: TIL</strong>.</li>
+      <li><strong>Allowed merge methods: Squash</strong>.</li>
+      <li>Require Code Owner review: kun <strong>TIL</strong>, hvis repositoryet har en vedligeholdt <code>CODEOWNERS</code>-fil.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>5. Status checks uden at l&aring;se repositoryet</h2>
+    <ol>
+      <li>Push CI-filen og lad workflowet k&oslash;re mindst &eacute;n gang.</li>
+      <li>Redig&eacute;r derefter rulesettet og aktiv&eacute;r <strong>Require status checks to pass</strong>.</li>
+      <li>V&aelig;lg det check-navn GitHub viser fra dit workflow, typisk <code>test</code>. G&aelig;t ikke navnet.</li>
+      <li>Lad <strong>Require branches to be up to date before merging</strong> v&aelig;re <strong>FRA</strong> for et lille projekt. Det undg&aring;r gentagne CI-k&oslash;rsler, hver gang <code>main</code> flytter sig.</li>
+      <li>Ved mange samtidige pull requests: aktiv&eacute;r i stedet streng up-to-date-kontrol eller en merge queue.</li>
+    </ol>
+    <div class="warning"><strong>Vigtigt:</strong> Kr&aelig;v aldrig et statuscheck, som endnu ikke findes eller ikke k&oslash;rer p&aring; alle relevante pull requests. Ellers kan ingen merge.</div>
+  </section>
+
+  <section>
+    <h2>6. Aktiv&eacute;r og test</h2>
+    <ol>
+      <li>Gem rulesettet, redig&eacute;r det igen, og skift <strong>Enforcement status</strong> til <strong>Active</strong>.</li>
+      <li>Opret en lille test-branch, lav en ufarlig &aelig;ndring, og &aring;bn en pull request mod <code>main</code>.</li>
+      <li>Kontroll&eacute;r at direkte push til <code>main</code> afvises, mens PR + squash merge virker.</li>
+      <li>Hvis du er l&aring;st ude: g&aring; til rulesettet og skift midlertidigt status til <strong>Disabled</strong>; ret den konkrete regel og aktiv&eacute;r igen. Opret ikke en permanent bred bypass.</li>
+    </ol>
+    <p class="small">Rulesets kan afh&aelig;nge af repositorytype og GitHub-abonnement. Hvis en anbefalet mulighed ikke vises, spring den over i stedet for at erstatte den med en bredere, mindre sikker regel.</p>
+  </section>
+
+  <section>
+    <h2>7. Din normale arbejdsgang bagefter</h2>
+    <ol>
+      <li>Opret en branch lokalt, eksempelvis <code>git switch -c feature/kort-navn</code>.</li>
+      <li>I Project Pusher skal branch-feltet v&aelig;re det samme navn, eksempelvis <code>feature/kort-navn</code>. Push ikke direkte til <code>main</code>.</li>
+      <li>&Aring;bn en pull request p&aring; GitHub, vent p&aring; eventuelle checks, l&oslash;s samtaler og v&aelig;lg <strong>Squash and merge</strong>.</li>
+      <li>Skift lokalt tilbage til <code>main</code>, hent den nye version, og opret n&aelig;ste feature-branch.</li>
+    </ol>
+    <p class="small">Det f&oslash;rste push til et helt tomt repository skal ske, f&oslash;r rulesettet kan beskytte default-branchen.</p>
+  </section>
+</body>
+</html>

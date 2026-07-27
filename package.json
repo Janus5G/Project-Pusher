@@ -1,0 +1,13 @@
+{
+  "name": "project-pusher",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Lokal Electron-app til sikker projektklargoring og GitHub-push",
+  "main": "main/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "43.2.0"
+  }
+}
