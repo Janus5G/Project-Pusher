@@ -103,16 +103,29 @@ function detectProjectType(folder) {
 }
 
 function getTestPreset(preset) {
-  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const python = process.platform === 'win32' ? 'python' : 'python3';
+
+  const npmCommand = args => {
+    if (process.platform === 'win32') {
+      return [process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', 'npm.cmd', ...args]];
+    }
+    return ['npm', args];
+  };
+
   const presets = {
-    'npm-test': [npm, ['test']],
-    'npm-lint': [npm, ['run', 'lint']],
-    'npm-build': [npm, ['run', 'build']],
+    'npm-test': npmCommand(['test']),
+    'npm-lint': npmCommand(['run', 'lint']),
+    'npm-build': npmCommand(['run', 'build']),
     'pytest': [python, ['-m', 'pytest']],
     'dotnet-test': ['dotnet', ['test']]
   };
   return presets[preset] || null;
+}
+
+function validateTestPreset(folder, preset) {
+  if (preset.startsWith('npm-') && !fs.existsSync(path.join(folder, 'package.json'))) {
+    throw new Error('Denne test kræver et Node.js-projekt, men package.json mangler i den valgte mappe.');
+  }
 }
 
 function generateFileContent(type, options) {
@@ -236,9 +249,20 @@ ipcMain.handle('get-folder-tree', async (event, folderPath) => {
 ipcMain.handle('run-test', async (event, folderPath, preset) => {
   assertTrustedEvent(event);
   const root = assertSelectedFolder(folderPath);
+  validateTestPreset(root, preset);
   const selected = getTestPreset(preset);
   if (!selected) throw new Error('Ukendt testvalg');
-  const result = await runProcess(selected[0], selected[1], root, { allowFailure: true });
+
+  let result;
+  try {
+    result = await runProcess(selected[0], selected[1], root, { allowFailure: true });
+  } catch (error) {
+    if (error && (error.code === 'ENOENT' || error.code === 'EINVAL')) {
+      throw new Error('Det valgte testværktøj kunne ikke startes. Kontrollér at det er installeret og tilgængeligt på systemet.');
+    }
+    throw error;
+  }
+
   return {
     command: [selected[0], ...selected[1]].join(' '),
     exitCode: result.code,
@@ -265,8 +289,14 @@ ipcMain.handle('generate-files', async (event, folderPath, options) => {
   if (files.changelog) add('CHANGELOG.md', 'changelog');
   if (files.ci) {
     const projectType = detectProjectType(root);
-    if (projectType === 'unknown') throw new Error('CI kr\u00e6ver package.json eller et genkendeligt Python-projekt');
-    add('.github/workflows/ci.yml', projectType === 'python' ? 'ci-python' : 'ci-node');
+    if (projectType === 'unknown') {
+      results.push({
+        path: path.join(root, '.github', 'workflows', 'ci.yml'),
+        status: 'sprunget over (GitHub CI kræver et genkendeligt Node.js- eller Python-projekt)'
+      });
+    } else {
+      add('.github/workflows/ci.yml', projectType === 'python' ? 'ci-python' : 'ci-node');
+    }
   }
   return results;
 });
