@@ -44,6 +44,14 @@ function lockWindow(win) {
   });
 }
 
+function getGitCommand() {
+  if (process.platform === 'win32' && app.isPackaged) {
+    const bundledGit = path.join(process.resourcesPath, 'git-win', 'cmd', 'git.exe');
+    if (fs.existsSync(bundledGit)) return bundledGit;
+  }
+  return 'git';
+}
+
 function runProcess(command, args, cwd, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -60,12 +68,10 @@ function runProcess(command, args, cwd, options = {}) {
       child.kill();
       reject(new Error('Kommandoen overskred tidsgr\u00e6nsen'));
     }, options.timeoutMs || 120000);
-
     const append = (current, chunk) => {
       const next = current + chunk.toString();
       return next.length > MAX_OUTPUT ? next.slice(0, MAX_OUTPUT) : next;
     };
-
     child.stdout.on('data', chunk => { stdout = append(stdout, chunk); });
     child.stderr.on('data', chunk => { stderr = append(stderr, chunk); });
     child.on('error', error => {
@@ -114,7 +120,6 @@ function generateFileContent(type, options) {
   const description = String(options.description || '').trim();
   const author = String(options.author || '').trim();
   const year = /^\d{4}$/.test(String(options.year)) ? String(options.year) : String(new Date().getFullYear());
-
   switch (type) {
     case 'gitignore':
       return detectProjectType(options.folder) === 'python'
@@ -123,7 +128,7 @@ function generateFileContent(type, options) {
     case 'readme':
       return `# ${projectName}\n\n${description || 'Tilf\u00f8j en kort projektbeskrivelse.'}\n\n## Kom godt i gang\n\nBeskriv installation og brug her.\n\n## Test\n\nBeskriv hvordan projektets tests k\u00f8res.\n`;
     case 'license':
-      return `MIT License\n\nCopyright (c) ${year} ${author || 'RETTIGHEDSHAVER'}\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the "Software"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n`;
+      return `MIT License\n\nCopyright (c) ${year} ${author || 'RETTIGHEDSHAVER'}\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the "Software"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.\nIN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n`;
     case 'editorconfig':
       return 'root = true\n\n[*]\nindent_style = space\nindent_size = 2\nend_of_line = lf\ncharset = utf-8\ntrim_trailing_whitespace = true\ninsert_final_newline = true\n';
     case 'contributing':
@@ -165,7 +170,6 @@ function parseGitHubRemote(remoteUrl) {
     parsed.search ||
     parsed.hash
   ) throw new Error('Brug en ren HTTPS-URL fra github.com uden token');
-
   const cleanPath = parsed.pathname.replace(/\/+$/, '');
   if (!/^\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?$/.test(cleanPath)) {
     throw new Error('URL skal ligne https://github.com/bruger/repository.git');
@@ -205,7 +209,6 @@ ipcMain.handle('get-folder-tree', async (event, folderPath) => {
   assertTrustedEvent(event);
   const root = assertSelectedFolder(folderPath);
   let count = 0;
-
   function getTree(dir) {
     if (++count > MAX_TREE_ENTRIES) return [{ name: '... visning begr\u00e6nset', type: 'file' }];
     let entries;
@@ -254,7 +257,6 @@ ipcMain.handle('generate-files', async (event, folderPath, options) => {
     fs.mkdirSync(path.dirname(target), { recursive: true });
     results.push(writeNewFile(target, generateFileContent(type, safeOptions)));
   };
-
   if (files.gitignore) add('.gitignore', 'gitignore');
   if (files.readme) add('README.md', 'readme');
   if (files.license) add('LICENSE', 'license');
@@ -279,32 +281,39 @@ ipcMain.handle('push-to-remote', async (event, folderPath, remoteUrl, branch, to
     throw new Error('Token mangler eller er ugyldigt');
   }
 
-  const repoCheck = await runProcess('git', ['rev-parse', '--is-inside-work-tree'], root, { allowFailure: true });
-  if (repoCheck.code !== 0) {
-    const init = await runProcess('git', ['init', '-b', safeBranch], root, { allowFailure: true });
-    if (init.code !== 0) {
-      await runProcess('git', ['init'], root);
-      await runProcess('git', ['checkout', '-b', safeBranch], root);
-    }
+  const git = getGitCommand();
+  try {
+    await runProcess(git, ['--version'], root);
+  } catch {
+    throw new Error(
+      process.platform === 'win32'
+        ? 'Git kunne ikke startes. Geninstaller Project Pusher, eller installer Git for Windows.'
+        : 'Git kunne ikke startes. Installer pakken "git" og pr\u00f8v igen.'
+    );
   }
 
-  const currentBranch = (await runProcess('git', ['branch', '--show-current'], root)).stdout.trim();
+  const repoCheck = await runProcess(git, ['rev-parse', '--is-inside-work-tree'], root, { allowFailure: true });
+  if (repoCheck.code !== 0) {
+    const init = await runProcess(git, ['init', '-b', safeBranch], root, { allowFailure: true });
+    if (init.code !== 0) {
+      await runProcess(git, ['init'], root);
+      await runProcess(git, ['checkout', '-b', safeBranch], root);
+    }
+  }
+  const currentBranch = (await runProcess(git, ['branch', '--show-current'], root)).stdout.trim();
   if (currentBranch && currentBranch !== safeBranch) {
     throw new Error(`Den valgte branch er '${safeBranch}', men projektet st\u00e5r p\u00e5 '${currentBranch}'`);
   }
-
-  const origin = await runProcess('git', ['remote', 'get-url', 'origin'], root, { allowFailure: true });
+  const origin = await runProcess(git, ['remote', 'get-url', 'origin'], root, { allowFailure: true });
   if (origin.code === 0 && origin.stdout.trim() !== safeRemote) {
     throw new Error(`Projektet har allerede en anden origin: ${origin.stdout.trim()}`);
   }
-  if (origin.code !== 0) await runProcess('git', ['remote', 'add', 'origin', safeRemote], root);
-
-  await runProcess('git', ['add', '--all'], root);
-  const staged = await runProcess('git', ['diff', '--cached', '--quiet'], root, { allowFailure: true });
+  if (origin.code !== 0) await runProcess(git, ['remote', 'add', 'origin', safeRemote], root);
+  await runProcess(git, ['add', '--all'], root);
+  const staged = await runProcess(git, ['diff', '--cached', '--quiet'], root, { allowFailure: true });
   if (staged.code === 1) {
-    await runProcess('git', ['commit', '-m', 'Opdateret via Project Pusher'], root);
+    await runProcess(git, ['commit', '-m', 'Opdateret via Project Pusher'], root);
   }
-
   let askPassPath;
   try {
     askPassPath = await createAskPass(safeToken);
@@ -314,7 +323,7 @@ ipcMain.handle('push-to-remote', async (event, folderPath, remoteUrl, branch, to
       GIT_TERMINAL_PROMPT: '0',
       PROJECT_PUSHER_TOKEN: safeToken
     };
-    await runProcess('git', ['push', '--set-upstream', 'origin', safeBranch], root, {
+    await runProcess(git, ['push', '--set-upstream', 'origin', safeBranch], root, {
       env,
       timeoutMs: 180000
     });

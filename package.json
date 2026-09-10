@@ -1,13 +1,102 @@
 {
   "name": "project-pusher",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
-  "description": "Lokal Electron-app til sikker projektklargoring og GitHub-push",
+  "description": "Securely prepare a local project and push it to GitHub",
+  "author": {
+    "name": "Janus Rokkjær",
+    "email": "janusdkbiz@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Janus5G/Project-Pusher",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Janus5G/Project-Pusher.git"
+  },
   "main": "main/main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis --x64",
+    "dist:linux": "electron-builder --linux deb --x64"
   },
   "devDependencies": {
-    "electron": "43.2.0"
+    "electron": "43.2.0",
+    "electron-builder": "26.16.1"
+  },
+  "build": {
+    "appId": "dk.janusrokkjaer.projectpusher",
+    "productName": "Project Pusher",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main/**/*",
+      "renderer/**/*",
+      "LICENSE",
+      "README.md",
+      "THIRD_PARTY_NOTICES.md",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Project-Pusher-Setup-${version}-${arch}.${ext}",
+      "extraResources": [
+        {
+          "from": "vendor/git-win",
+          "to": "git-win",
+          "filter": [
+            "**/*"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "shortcutName": "Project Pusher"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Development",
+      "maintainer": "Janus Rokkjær <janusdkbiz@gmail.com>",
+      "vendor": "Janus Rokkjær",
+      "synopsis": "Securely prepare and push local projects to GitHub",
+      "description": "Project Pusher helps prepare a local project, add standard repository files, run selected checks and push the project to GitHub.",
+      "executableName": "project-pusher",
+      "artifactName": "Project-Pusher-${version}-${arch}.${ext}"
+    },
+    "deb": {
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0",
+        "git"
+      ],
+      "priority": "optional"
+    }
   }
 }
