@@ -1,0 +1,130 @@
+name: Build and release installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+  MINGIT_VERSION: "2.55.0.5"
+  MINGIT_SHA256: "56d7b226b7693196cfc71fef26568f536c4a021ab6c37ff2db4287bed908e96e"
+
+jobs:
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install build dependencies
+        shell: pwsh
+        run: npm install --no-audit --no-fund
+
+      - name: Download and verify MinGit
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $url = "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/MinGit-${env:MINGIT_VERSION}-64-bit.zip"
+          $zip = Join-Path $env:RUNNER_TEMP "mingit.zip"
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          $actual = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
+          $expected = $env:MINGIT_SHA256.ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "MinGit SHA-256 mismatch. Expected $expected, got $actual"
+          }
+          New-Item -ItemType Directory -Force -Path "vendor/git-win" | Out-Null
+          Expand-Archive -Path $zip -DestinationPath "vendor/git-win" -Force
+          if (-not (Test-Path "vendor/git-win/cmd/git.exe")) {
+            throw "Bundled Git executable was not found after extraction."
+          }
+          & "vendor/git-win/cmd/git.exe" --version
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: npm run dist:win
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-pusher-windows
+          path: dist/*.exe
+          if-no-files-found: error
+
+  linux:
+    name: Debian package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install build dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build Debian package
+        run: npm run dist:linux
+
+      - name: Inspect Debian package metadata
+        run: |
+          set -euo pipefail
+          deb="$(find dist -maxdepth 1 -name '*.deb' -print -quit)"
+          test -n "$deb"
+          dpkg-deb --info "$deb"
+          dpkg-deb --contents "$deb" >/dev/null
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-pusher-linux
+          path: dist/*.deb
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Create SHA-256 checksums
+        working-directory: release
+        run: sha256sum *.exe *.deb > SHA256SUMS.txt
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/* --clobber
+          else
+            gh release create "$TAG" release/* \
+              --title "Project Pusher $TAG" \
+              --generate-notes
+          fi
